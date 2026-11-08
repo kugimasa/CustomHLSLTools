@@ -1,5 +1,7 @@
 # Custom HLSL Tools
 
+[English](README.md) | 日本語
+
 マテリアルの **Custom ノード**で使う HLSL を、外部エディタ(VS Code / Rider / Visual Studio など)で編集するためのエディタ専用プラグインです。
 
 ## 機能
