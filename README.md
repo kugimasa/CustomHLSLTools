@@ -8,8 +8,9 @@
   Custom ノードの Details に追加されます。`Include File Paths` に登録された `.ush` / `.usf` を外部エディタで開きます。
 - **保存時の自動再コンパイル**
   `<Project>/Shaders` と(エンジン以外の)有効なプラグインの `Shaders` フォルダを監視し、`.ush` / `.usf` が保存されると、そのフォルダのファイルを include しているロード済みマテリアルを再コンパイルします。
-- **設定** (`Project Settings > Plugins > Custom HLSL Tools`)
+- **設定** (`Editor Preferences > Plugins > Custom HLSL Tools`)
   外部エディタの起動方法 (Source Code Accessor / OS 関連付け / 任意コマンド)、自動再コンパイルの ON/OFF、待ち時間。
+  `Source Code Accessor` を選んだ場合は `Editor Preferences > General > Source Code` で選択したエディタが使われます。
 
 ## 使い方
 

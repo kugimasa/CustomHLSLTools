@@ -62,7 +62,7 @@ namespace
 		if (Files.Num() > 0 && !CustomHLSLTools::OpenFilesInExternalEditor(Files))
 		{
 			CustomHLSLTools::ShowNotification(
-				LOCTEXT("OpenFailed", "Failed to open the file. Check the open mode in Project Settings > Plugins > Custom HLSL Tools."), false);
+				LOCTEXT("OpenFailed", "Failed to open the file. Check the open mode in Editor Preferences > Plugins > Custom HLSL Tools."), false);
 		}
 
 		return FReply::Handled();
@@ -96,7 +96,7 @@ void FCustomHLSLExpressionCustomization::CustomizeDetails(IDetailLayoutBuilder& 
 		SNew(SButton)
 		.HAlign(HAlign_Center)
 		.Text(LOCTEXT("OpenInExternalEditor", "Open Include Files in External Editor"))
-		.ToolTipText(LOCTEXT("OpenInExternalEditorTooltip", "Opens every file listed in 'Include File Paths' with the editor configured in Project Settings > Plugins > Custom HLSL Tools."))
+		.ToolTipText(LOCTEXT("OpenInExternalEditorTooltip", "Opens every file listed in 'Include File Paths' with the editor configured in Editor Preferences > Plugins > Custom HLSL Tools."))
 		.OnClicked_Lambda([Expressions]()
 		{
 			return OpenIncludeFiles(Expressions);

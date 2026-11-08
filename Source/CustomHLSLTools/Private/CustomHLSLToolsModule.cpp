@@ -1,8 +1,6 @@
 #include "CustomHLSLExpressionCustomization.h"
 #include "CustomHLSLShaderWatcher.h"
 #include "CustomHLSLToolsLog.h"
-#include "CustomHLSLToolsSettings.h"
-#include "ISettingsModule.h"
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
 
@@ -20,26 +18,13 @@ public:
 			"MaterialExpressionCustom",
 			FOnGetDetailCustomizationInstance::CreateStatic(&FCustomHLSLExpressionCustomization::MakeInstance));
 
-		if (ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>("Settings"))
-		{
-			SettingsModule->RegisterSettings(
-				"Editor", "Plugins", "CustomHLSLTools",
-				LOCTEXT("SettingsName", "Custom HLSL Tools"),
-				LOCTEXT("SettingsDescription", "External editor and hot reload settings for Material Custom HLSL nodes."),
-				GetMutableDefault<UCustomHLSLToolsSettings>());
-		}
-
+		// UCustomHLSLToolsSettings is a UDeveloperSettings and is registered automatically in Editor Preferences > Plugins.
 		Watcher.Start();
 	}
 
 	virtual void ShutdownModule() override
 	{
 		Watcher.Stop();
-
-		if (ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>("Settings"))
-		{
-			SettingsModule->UnregisterSettings("Editor", "Plugins", "CustomHLSLTools");
-		}
 
 		if (FPropertyEditorModule* PropertyModule = FModuleManager::GetModulePtr<FPropertyEditorModule>("PropertyEditor"))
 		{
