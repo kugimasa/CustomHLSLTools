@@ -4,6 +4,8 @@ English | [日本語](README_ja.md)
 
 An editor-only plugin for editing the HLSL used by Material **Custom nodes** in an external editor (VS Code / Rider / Visual Studio, etc.).
 
+![Demo](docs/demo.gif)
+
 ## Features
 
 - **Open Include Files in External Editor** button

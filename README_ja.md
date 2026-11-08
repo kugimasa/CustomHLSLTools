@@ -4,6 +4,8 @@
 
 マテリアルの **Custom ノード**で使う HLSL を、外部エディタ(VS Code / Rider / Visual Studio など)で編集するためのエディタ専用プラグインです。
 
+![デモ](docs/demo.gif)
+
 ## 機能
 
 - **Open Include Files in External Editor** ボタン
