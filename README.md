@@ -42,7 +42,7 @@ Place this repository at `<Project>/Plugins/CustomHLSLTools`.
 
 ## Supported versions
 
-Developed against source-built UE 5.8. The plugin depends on engine-internal APIs (`MaterialEditingLibrary`, `FMaterialCachedExpressionData`, etc.), so other versions may require build fixes.
+UE 5.8
 
 ## License
 

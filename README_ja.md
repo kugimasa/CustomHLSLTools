@@ -42,7 +42,7 @@ Custom ノードの Details に追加されます。`Include File Paths` に登�
 
 ## 対応バージョン
 
-ソース版 UE 5.8 系で作成。エンジン内部の API(`MaterialEditingLibrary`, `FMaterialCachedExpressionData` など)に依存するため、他バージョンではビルド修正が必要な場合があります。
+UE 5.8
 
 ## ライセンス
 
