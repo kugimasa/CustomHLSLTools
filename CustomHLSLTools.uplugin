@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "0.1.0",
+	"Version": 2,
+	"VersionName": "0.2.0",
 	"FriendlyName": "Custom HLSL Tools",
 	"Description": "Opens the .ush/.usf files referenced by Material Custom HLSL nodes in an external editor, and recompiles affected materials when those files are saved.",
 	"Category": "Editor",

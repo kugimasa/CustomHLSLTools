@@ -10,8 +10,18 @@
 
 - **Open Include Files in External Editor** ボタン
 Custom ノードの Details に追加されます。`Include File Paths` に登録された `.ush` / `.usf` を外部エディタで開きます。
+- **シェーダーファイルの新規作成** (Custom ノードの Details パネル)
+  `MyFunc` のような名前 (`Sub/MyFunc` のようにサブフォルダも可) を入力して **Create** を押すと、ノードの入力と出力タイプから関数を生成した `<Project>/Shaders/MyFunc.ush` を作成し、ノードの `Include File Paths` / `Code` / `Description` をそれを呼ぶ形に設定します。既存ファイルは上書きしません。`<Project>/Shaders` が無い場合は作成し、エディタ再起動なしで `/Project` にマップします。
+  シェーダーファイルが未設定の間は **Create** だけが表示されます。作成後は **Shader File** 欄でファイル名を変更でき、ファイル・ファイル内の関数名・`Include File Paths` / `Code` / `Description` がまとめて更新されます。
+- **既存シェーダーファイルの利用**
+  **Existing Shader File** のプルダウンに `<Project>/Shaders` の `.ush` を一覧表示します (ファイルがある場合のみ表示)。選ぶと関数シグネチャからノードを設定し、既にファイルが設定されているノードでは現在の `Include File Paths` のエントリを置き換えます。
+- **ファイル欠落への対処**
+  エディタ外でシェーダーファイルが削除された場合、Details パネルに警告と **Recreate** ボタンを表示し、通知からも欠落ファイルをまとめて再作成できます。欠落ファイルを include しているマテリアルは自動再コンパイルの対象外になります。
+- **Set Up Node from Include File** ボタン
+  `Include File Paths` の先頭ファイルの関数シグネチャを読み取り、`Inputs` / `Output Type` / `Code` を設定します。名前が変わらない入力は接続を維持します。戻り値は `float` / `float2` / `float3` / `float4` / `FMaterialAttributes` に対応 (`out` / `inout` 引数は非対応)。
 - **保存時の自動再コンパイル**
 `<Project>/Shaders` と(エンジン以外の)有効なプラグインの `Shaders` フォルダを監視し、`.ush` / `.usf` が保存されると、そのフォルダのファイルを include しているロード済みマテリアルを再コンパイルします。
+- Details パネルにプラグインのアイコンを表示し、このプラグインが追加した項目だと分かるようにしています。
 - **設定** (`Editor Preferences > Plugins > Custom HLSL Tools`)
 外部エディタの起動方法 (Source Code Accessor / OS 関連付け / 任意コマンド)、自動再コンパイルの ON/OFF、待ち時間。
 `Source Code Accessor` を選んだ場合は `Editor Preferences > General > Source Code` で選択したエディタが使われます。

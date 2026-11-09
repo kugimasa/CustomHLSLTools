@@ -1,5 +1,6 @@
 #include "CustomHLSLShaderWatcher.h"
 
+#include "CustomHLSLNodeSetup.h"
 #include "CustomHLSLShaderUtils.h"
 #include "CustomHLSLToolsLog.h"
 #include "CustomHLSLToolsSettings.h"
@@ -9,6 +10,9 @@
 #include "MaterialCachedData.h"
 #include "MaterialEditingLibrary.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialExpressionCustom.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Widgets/Notifications/SNotificationList.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
@@ -97,6 +101,7 @@ void FCustomHLSLShaderWatcher::OnDirectoryChanged(const TArray<FFileChangeData>&
 		const FString Extension = FPaths::GetExtension(Change.Filename).ToLower();
 		if (Extension == TEXT("ush") || Extension == TEXT("usf"))
 		{
+			bFileRemoved |= Change.Action == FFileChangeData::FCA_Removed;
 			ChangedRoots.Add(Root);
 			LastChangeTime = FPlatformTime::Seconds();
 			return;
@@ -112,18 +117,120 @@ bool FCustomHLSLShaderWatcher::Tick(float DeltaTime)
 	}
 
 	const UCustomHLSLToolsSettings* Settings = GetDefault<UCustomHLSLToolsSettings>();
-	if (!Settings->bAutoRecompileOnSave)
+	if (FPlatformTime::Seconds() - LastChangeTime < Settings->RecompileDelaySeconds)
 	{
-		ChangedRoots.Reset();
 		return true;
 	}
 
-	if (FPlatformTime::Seconds() - LastChangeTime >= Settings->RecompileDelaySeconds)
+	if (bFileRemoved)
+	{
+		NotifyMissingShaderFiles();
+		bFileRemoved = false;
+	}
+	if (Settings->bAutoRecompileOnSave)
 	{
 		RecompileAffectedMaterials();
-		ChangedRoots.Reset();
 	}
+	ChangedRoots.Reset();
 	return true;
+}
+
+void FCustomHLSLShaderWatcher::NotifyMissingShaderFiles()
+{
+	// Include files that Custom nodes still point to but that no longer exist, e.g. deleted in the file explorer.
+	TArray<TPair<TWeakObjectPtr<UMaterialExpressionCustom>, FString>> Missing;
+	TSet<FString> MissingPaths;
+	for (TObjectIterator<UMaterialExpressionCustom> It; It; ++It)
+	{
+		UMaterialExpressionCustom* Expression = *It;
+		if (!IsValid(Expression) || Expression->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject) || !Expression->GetOuter() || Expression->GetOutermost() == GetTransientPackage())
+		{
+			continue;
+		}
+
+		for (const FString& VirtualPath : Expression->IncludeFilePaths)
+		{
+			if (!VirtualPath.IsEmpty() && CustomHLSLTools::IsShaderFileMissing(VirtualPath))
+			{
+				bool bAlreadyListed = false;
+				MissingPaths.Add(VirtualPath, &bAlreadyListed);
+				if (!bAlreadyListed)
+				{
+					Missing.Emplace(Expression, VirtualPath);
+				}
+			}
+		}
+	}
+
+	if (Missing.IsEmpty())
+	{
+		return;
+	}
+
+	for (const TPair<TWeakObjectPtr<UMaterialExpressionCustom>, FString>& Entry : Missing)
+	{
+		UE_LOGF(LogCustomHLSLTools, Warning, "Shader file '%ls' is used by a Custom node but does not exist.", *Entry.Value);
+	}
+
+	FNotificationInfo Info(FText::Format(
+		LOCTEXT("MissingFiles", "{0} shader file(s) used by Custom nodes no longer exist, so the materials will fail to compile."), Missing.Num()));
+	Info.bFireAndForget = false;
+	Info.bUseLargeFont = false;
+	Info.ExpireDuration = 0.0f;
+	Info.FadeOutDuration = 0.5f;
+
+	const TSharedRef<TWeakPtr<SNotificationItem>> NotificationHolder = MakeShared<TWeakPtr<SNotificationItem>>();
+	Info.ButtonDetails.Add(FNotificationButtonInfo(
+		LOCTEXT("RecreateMissing", "Recreate"),
+		LOCTEXT("RecreateMissingTooltip", "Writes the missing files again from the Custom nodes' inputs and output types."),
+		FSimpleDelegate::CreateLambda([Missing, NotificationHolder]()
+		{
+			int32 NumRecreated = 0;
+			for (const TPair<TWeakObjectPtr<UMaterialExpressionCustom>, FString>& Entry : Missing)
+			{
+				FText Error;
+				if (UMaterialExpressionCustom* Expression = Entry.Key.Get())
+				{
+					if (CustomHLSLTools::RecreateShaderFile(*Expression, Entry.Value, Error))
+					{
+						++NumRecreated;
+					}
+					else
+					{
+						CustomHLSLTools::ShowNotification(Error, false);
+					}
+				}
+			}
+			if (TSharedPtr<SNotificationItem> Item = NotificationHolder->Pin())
+			{
+				Item->SetCompletionState(SNotificationItem::CS_Success);
+				Item->ExpireAndFadeout();
+			}
+			if (NumRecreated > 0)
+			{
+				CustomHLSLTools::ShowNotification(FText::Format(LOCTEXT("RecreatedFiles", "Recreated {0} shader file(s)."), NumRecreated), true);
+			}
+		}),
+		SNotificationItem::CS_None));
+	Info.ButtonDetails.Add(FNotificationButtonInfo(
+		LOCTEXT("DismissMissing", "Dismiss"),
+		FText(),
+		FSimpleDelegate::CreateLambda([NotificationHolder]()
+		{
+			if (TSharedPtr<SNotificationItem> Item = NotificationHolder->Pin())
+			{
+				Item->SetCompletionState(SNotificationItem::CS_None);
+				Item->ExpireAndFadeout();
+			}
+		}),
+		SNotificationItem::CS_None));
+
+	TSharedPtr<SNotificationItem> Item = FSlateNotificationManager::Get().AddNotification(Info);
+	if (Item.IsValid())
+	{
+		Item->SetCompletionState(SNotificationItem::CS_Fail);
+		*NotificationHolder = Item;
+	}
 }
 
 void FCustomHLSLShaderWatcher::RecompileAffectedMaterials()
@@ -147,8 +254,16 @@ void FCustomHLSLShaderWatcher::RecompileAffectedMaterials()
 		}
 
 		bool bUsesChangedRoot = false;
+		bool bHasMissingFile = false;
 		for (const FString& VirtualPath : CachedData.EditorOnlyData->ExpressionIncludeFilePaths)
 		{
+			if (CustomHLSLTools::IsShaderFileMissing(VirtualPath))
+			{
+				bHasMissingFile = true;
+				UE_LOGF(LogCustomHLSLTools, Warning, "%ls includes '%ls' which does not exist, skipping recompile.", *Material->GetPathName(), *VirtualPath);
+				break;
+			}
+
 			const FString RealPath = GetShaderSourceFilePath(VirtualPath);
 			if (RealPath.IsEmpty())
 			{
@@ -170,7 +285,7 @@ void FCustomHLSLShaderWatcher::RecompileAffectedMaterials()
 			}
 		}
 
-		if (bUsesChangedRoot)
+		if (bUsesChangedRoot && !bHasMissingFile)
 		{
 			Affected.Add(Material);
 		}
