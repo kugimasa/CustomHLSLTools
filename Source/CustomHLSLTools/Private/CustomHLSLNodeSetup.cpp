@@ -152,13 +152,11 @@ namespace
 		{
 			if (Source[Index] == TEXT('/') && Index + 1 < Length && Source[Index + 1] == TEXT('/'))
 			{
-				while (Index < Length && Source[Index] != TEXT('
-'))
+				while (Index < Length && Source[Index] != TEXT('\n'))
 				{
 					++Index;
 				}
-				Result.AppendChar(TEXT('
-'));
+				Result.AppendChar(TEXT('\n'));
 			}
 			else if (Source[Index] == TEXT('/') && Index + 1 < Length && Source[Index + 1] == TEXT('*'))
 			{
