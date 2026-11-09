@@ -18,11 +18,27 @@
 namespace CustomHLSLTools
 {
 
-FString ResolveVirtualShaderPath(const FString& VirtualPath, FText& OutError)
+FString GetAbsoluteShaderPath(const FString& VirtualPath)
 {
 	TArray<FShaderCompilerError> Errors;
 	const FString RealPath = GetShaderSourceFilePath(VirtualPath, &Errors);
 	if (RealPath.IsEmpty())
+	{
+		return FString();
+	}
+	return IFileManager::Get().ConvertToAbsolutePathForExternalAppForWrite(*RealPath);
+}
+
+bool IsShaderFileMissing(const FString& VirtualPath)
+{
+	const FString AbsolutePath = GetAbsoluteShaderPath(VirtualPath);
+	return !AbsolutePath.IsEmpty() && !FPaths::FileExists(AbsolutePath);
+}
+
+FString ResolveVirtualShaderPath(const FString& VirtualPath, FText& OutError)
+{
+	const FString AbsolutePath = GetAbsoluteShaderPath(VirtualPath);
+	if (AbsolutePath.IsEmpty())
 	{
 		OutError = FText::Format(
 			LOCTEXT("CannotMapPath", "Cannot map '{0}' to a shader directory. Check the extension (.ush/.usf) and that the directory is registered (/Project requires a Shaders folder at editor startup)."),
@@ -30,7 +46,6 @@ FString ResolveVirtualShaderPath(const FString& VirtualPath, FText& OutError)
 		return FString();
 	}
 
-	const FString AbsolutePath = IFileManager::Get().ConvertToAbsolutePathForExternalAppForWrite(*RealPath);
 	if (!FPaths::FileExists(AbsolutePath))
 	{
 		OutError = FText::Format(LOCTEXT("FileMissing", "File not found: {0}"), FText::FromString(AbsolutePath));

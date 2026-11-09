@@ -10,6 +10,12 @@ namespace CustomHLSLTools
 	 */
 	FString ResolveVirtualShaderPath(const FString& VirtualPath, FText& OutError);
 
+	/** Maps a virtual shader path to an absolute file path without checking that the file exists. Returns an empty string if it cannot be mapped. */
+	FString GetAbsoluteShaderPath(const FString& VirtualPath);
+
+	/** True if the virtual path maps to a shader directory but the file is not there (e.g. deleted in the file explorer). */
+	bool IsShaderFileMissing(const FString& VirtualPath);
+
 	/** Opens the files using the method chosen in the plugin settings. Returns false if nothing could be opened. */
 	bool OpenFilesInExternalEditor(const TArray<FString>& AbsoluteFilePaths);
 

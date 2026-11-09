@@ -261,10 +261,173 @@ namespace
 
 		return true;
 	}
+
+	/** A node without inputs gets a single placeholder so that the generated function has something to work with. */
+	TArray<FCustomInput> GetInputsForSource(const UMaterialExpressionCustom& Expression)
+	{
+		TArray<FCustomInput> Inputs = Expression.Inputs;
+		Inputs.RemoveAll([](const FCustomInput& Input) { return Input.InputName.IsNone(); });
+		if (Inputs.IsEmpty())
+		{
+			FCustomInput& Input = Inputs.AddDefaulted_GetRef();
+			Input.InputName = TEXT("A");
+		}
+		return Inputs;
+	}
+
+	/** Replaces whole-word occurrences of an identifier. */
+	FString ReplaceIdentifier(const FString& Source, const FString& OldName, const FString& NewName)
+	{
+		if (OldName.IsEmpty() || OldName == NewName)
+		{
+			return Source;
+		}
+
+		FString Result;
+		int32 Index = 0;
+		while (Index < Source.Len())
+		{
+			const int32 Found = Source.Find(OldName, ESearchCase::CaseSensitive, ESearchDir::FromStart, Index);
+			if (Found == INDEX_NONE)
+			{
+				break;
+			}
+
+			const int32 End = Found + OldName.Len();
+			const bool bStartsWord = Found == 0 || !(FChar::IsAlnum(Source[Found - 1]) || Source[Found - 1] == TEXT('_'));
+			const bool bEndsWord = End >= Source.Len() || !(FChar::IsAlnum(Source[End]) || Source[End] == TEXT('_'));
+
+			Result.AppendChars(*Source + Index, Found - Index);
+			Result.Append(bStartsWord && bEndsWord ? NewName : OldName);
+			Index = End;
+		}
+		Result.AppendChars(*Source + Index, Source.Len() - Index);
+		return Result;
+	}
 }
 
 namespace CustomHLSLTools
 {
+
+bool GetProjectShaderRelativeName(const FString& VirtualPath, FString& OutName)
+{
+	const FString Prefix = TEXT("/Project/");
+	if (!VirtualPath.StartsWith(Prefix, ESearchCase::IgnoreCase) || !VirtualPath.EndsWith(TEXT(".ush"), ESearchCase::IgnoreCase))
+	{
+		return false;
+	}
+	OutName = VirtualPath.Mid(Prefix.Len(), VirtualPath.Len() - Prefix.Len() - 4);
+	return !OutName.IsEmpty();
+}
+
+bool RecreateShaderFile(UMaterialExpressionCustom& Expression, const FString& VirtualPath, FText& OutError)
+{
+	const FString FilePath = GetAbsoluteShaderPath(VirtualPath);
+	if (FilePath.IsEmpty())
+	{
+		OutError = FText::Format(LOCTEXT("CannotMapRecreate", "Cannot map '{0}' to a shader directory."), FText::FromString(VirtualPath));
+		return false;
+	}
+	if (FPaths::FileExists(FilePath))
+	{
+		OutError = FText::Format(LOCTEXT("AlreadyExistsRecreate", "File already exists: {0}"), FText::FromString(FilePath));
+		return false;
+	}
+
+	const FString FunctionName = ToIdentifier(FPaths::GetBaseFilename(FilePath));
+	const FString Source = BuildShaderSource(FunctionName, Expression.OutputType, GetInputsForSource(Expression));
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(FilePath), true);
+	if (!FFileHelper::SaveStringToFile(Source, *FilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{
+		OutError = FText::Format(LOCTEXT("WriteFailedRecreate", "Failed to write file: {0}"), FText::FromString(FilePath));
+		return false;
+	}
+	FlushShaderFileCache();
+	return true;
+}
+
+bool RenameShaderFile(UMaterialExpressionCustom& Expression, const FString& VirtualPath, const FString& NewRelativeName, FText& OutError)
+{
+	FString OldName;
+	if (!GetProjectShaderRelativeName(VirtualPath, OldName))
+	{
+		OutError = LOCTEXT("RenameProjectOnly", "Only files in <Project>/Shaders (/Project/...) can be renamed here.");
+		return false;
+	}
+
+	FString NewName;
+	if (!NormalizeRelativeName(NewRelativeName, NewName, OutError))
+	{
+		return false;
+	}
+	if (NewName == OldName)
+	{
+		return true;
+	}
+
+	const FString OldFile = ResolveVirtualShaderPath(VirtualPath, OutError);
+	if (OldFile.IsEmpty())
+	{
+		return false;
+	}
+
+	const FString NewVirtualPath = FString::Printf(TEXT("/Project/%s.ush"), *NewName);
+	const FString NewFile = FPaths::Combine(GetProjectShaderDirectory(), NewName + TEXT(".ush"));
+	if (FPaths::FileExists(NewFile) && !OldFile.Equals(NewFile, ESearchCase::IgnoreCase))
+	{
+		OutError = FText::Format(LOCTEXT("RenameTargetExists", "File already exists: {0}"), FText::FromString(NewFile));
+		return false;
+	}
+	if (!EnsureProjectShaderDirectory(OutError))
+	{
+		return false;
+	}
+
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(NewFile), true);
+	if (!IFileManager::Get().Move(*NewFile, *OldFile, false))
+	{
+		OutError = FText::Format(LOCTEXT("RenameFailed", "Failed to rename the file to: {0}"), FText::FromString(NewFile));
+		return false;
+	}
+
+	// Keep the function name in sync with the file name, which is what the node setup looks for.
+	const FString OldFunction = ToIdentifier(FPaths::GetBaseFilename(OldName));
+	const FString NewFunction = ToIdentifier(FPaths::GetBaseFilename(NewName));
+	FString Source;
+	if (OldFunction != NewFunction && FFileHelper::LoadFileToString(Source, *NewFile))
+	{
+		FFileHelper::SaveStringToFile(ReplaceIdentifier(Source, OldFunction, NewFunction), *NewFile, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	}
+	FlushShaderFileCache();
+
+	Expression.Modify();
+	ModifyProperty(Expression, GET_MEMBER_NAME_CHECKED(UMaterialExpressionCustom, IncludeFilePaths), [&]()
+	{
+		for (FString& Path : Expression.IncludeFilePaths)
+		{
+			if (Path == VirtualPath)
+			{
+				Path = NewVirtualPath;
+			}
+		}
+	});
+	if (OldFunction != NewFunction)
+	{
+		ModifyProperty(Expression, GET_MEMBER_NAME_CHECKED(UMaterialExpressionCustom, Code), [&]()
+		{
+			Expression.Code = ReplaceIdentifier(Expression.Code, OldFunction, NewFunction);
+		});
+		if (Expression.Description == OldFunction)
+		{
+			ModifyProperty(Expression, GET_MEMBER_NAME_CHECKED(UMaterialExpressionCustom, Description), [&]()
+			{
+				Expression.Description = NewFunction;
+			});
+		}
+	}
+
+	return true;
+}
 
 bool CreateShaderFile(UMaterialExpressionCustom& Expression, const FString& RelativeName, FText& OutError)
 {
@@ -288,14 +451,7 @@ bool CreateShaderFile(UMaterialExpressionCustom& Expression, const FString& Rela
 		return false;
 	}
 
-	// A node without inputs gets a single placeholder so that the generated function has something to work with.
-	TArray<FCustomInput> Inputs = Expression.Inputs;
-	Inputs.RemoveAll([](const FCustomInput& Input) { return Input.InputName.IsNone(); });
-	if (Inputs.IsEmpty())
-	{
-		FCustomInput& Input = Inputs.AddDefaulted_GetRef();
-		Input.InputName = TEXT("A");
-	}
+	const TArray<FCustomInput> Inputs = GetInputsForSource(Expression);
 
 	const ECustomMaterialOutputType OutputType = Expression.OutputType;
 	if (!FFileHelper::SaveStringToFile(BuildShaderSource(FunctionName, OutputType, Inputs), *FilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))

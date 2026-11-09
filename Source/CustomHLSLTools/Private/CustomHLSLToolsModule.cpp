@@ -2,6 +2,7 @@
 #include "CustomHLSLShaderUtils.h"
 #include "CustomHLSLShaderWatcher.h"
 #include "CustomHLSLToolsLog.h"
+#include "CustomHLSLToolsStyle.h"
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
 
@@ -14,6 +15,8 @@ class FCustomHLSLToolsModule : public IModuleInterface
 public:
 	virtual void StartupModule() override
 	{
+		CustomHLSLToolsStyle::Register();
+
 		FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 		PropertyModule.RegisterCustomClassLayout(
 			"MaterialExpressionCustom",
@@ -39,6 +42,8 @@ public:
 		{
 			PropertyModule->UnregisterCustomClassLayout("MaterialExpressionCustom");
 		}
+
+		CustomHLSLToolsStyle::Unregister();
 	}
 
 private:
