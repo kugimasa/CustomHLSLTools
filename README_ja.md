@@ -10,6 +10,10 @@
 
 - **Open Include Files in External Editor** ボタン
 Custom ノードの Details に追加されます。`Include File Paths` に登録された `.ush` / `.usf` を外部エディタで開きます。
+- **シェーダーファイルの新規作成** (Custom ノードの Details パネル)
+  `MyFunc` のような名前 (`Sub/MyFunc` のようにサブフォルダも可) を入力して **Create** を押すと、ノードの入力と出力タイプから関数を生成した `<Project>/Shaders/MyFunc.ush` を作成し、ノードの `Include File Paths` / `Code` / `Description` をそれを呼ぶ形に設定します。既存ファイルは上書きしません。`<Project>/Shaders` が無い場合は作成し、エディタ再起動なしで `/Project` にマップします。
+- **Set Up Node from Include File** ボタン
+  `Include File Paths` の先頭ファイルの関数シグネチャを読み取り、`Inputs` / `Output Type` / `Code` を設定します。名前が変わらない入力は接続を維持します。戻り値は `float` / `float2` / `float3` / `float4` / `FMaterialAttributes` に対応 (`out` / `inout` 引数は非対応)。
 - **保存時の自動再コンパイル**
 `<Project>/Shaders` と(エンジン以外の)有効なプラグインの `Shaders` フォルダを監視し、`.ush` / `.usf` が保存されると、そのフォルダのファイルを include しているロード済みマテリアルを再コンパイルします。
 - **設定** (`Editor Preferences > Plugins > Custom HLSL Tools`)

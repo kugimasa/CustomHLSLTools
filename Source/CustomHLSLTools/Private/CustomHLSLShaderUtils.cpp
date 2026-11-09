@@ -93,6 +93,47 @@ bool OpenFilesInExternalEditor(const TArray<FString>& AbsoluteFilePaths)
 	return bAnyOpened;
 }
 
+FString GetProjectShaderDirectory()
+{
+	FString Directory = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectDir(), TEXT("Shaders")));
+	FPaths::NormalizeDirectoryName(Directory);
+	return Directory;
+}
+
+bool EnsureProjectShaderDirectory(FText& OutError)
+{
+	const FString Directory = GetProjectShaderDirectory();
+
+	bool bCreated = false;
+	if (!IFileManager::Get().DirectoryExists(*Directory))
+	{
+		if (!IFileManager::Get().MakeDirectory(*Directory, true))
+		{
+			OutError = FText::Format(LOCTEXT("CannotCreateDirectory", "Failed to create directory: {0}"), FText::FromString(Directory));
+			return false;
+		}
+		bCreated = true;
+	}
+
+	// The engine only maps /Project at startup if the folder existed then, so add the mapping ourselves.
+	if (!AllShaderSourceDirectoryMappings().Contains(TEXT("/Project")))
+	{
+		AddShaderSourceDirectoryMapping(TEXT("/Project"), Directory);
+	}
+
+	if (bCreated)
+	{
+		OnShaderDirectoryCreated().Broadcast();
+	}
+	return true;
+}
+
+FSimpleMulticastDelegate& OnShaderDirectoryCreated()
+{
+	static FSimpleMulticastDelegate Delegate;
+	return Delegate;
+}
+
 void ShowNotification(const FText& Message, bool bSuccess)
 {
 	FNotificationInfo Info(Message);

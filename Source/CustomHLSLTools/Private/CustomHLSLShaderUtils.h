@@ -13,6 +13,18 @@ namespace CustomHLSLTools
 	/** Opens the files using the method chosen in the plugin settings. Returns false if nothing could be opened. */
 	bool OpenFilesInExternalEditor(const TArray<FString>& AbsoluteFilePaths);
 
+	/** Returns <Project>/Shaders as an absolute path. */
+	FString GetProjectShaderDirectory();
+
+	/**
+	 * Creates <Project>/Shaders if needed and makes sure it is mapped as /Project.
+	 * Broadcasts OnShaderDirectoryCreated() when the folder was newly created. Returns false on failure.
+	 */
+	bool EnsureProjectShaderDirectory(FText& OutError);
+
+	/** Broadcast after <Project>/Shaders was created at runtime, so that it can be watched without restarting the editor. */
+	FSimpleMulticastDelegate& OnShaderDirectoryCreated();
+
 	/** Shows a Slate toast notification. */
 	void ShowNotification(const FText& Message, bool bSuccess);
 }

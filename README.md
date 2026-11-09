@@ -10,6 +10,10 @@ An editor-only plugin for editing the HLSL used by Material **Custom nodes** in 
 
 - **Open Include Files in External Editor** button
   Added to the Custom node's Details panel. Opens the `.ush` / `.usf` files listed in `Include File Paths` in your external editor.
+- **Create shader file** (Custom node's Details panel)
+  Enter a name such as `MyFunc` (sub folders like `Sub/MyFunc` are allowed) and click **Create**. `<Project>/Shaders/MyFunc.ush` is generated with a function built from the node's inputs and output type, and the node's `Include File Paths`, `Code` and `Description` are set up to call it. Existing files are never overwritten, and `<Project>/Shaders` is created and mapped as `/Project` without restarting the editor.
+- **Set Up Node from Include File** button
+  Reads the function signature of the first file in `Include File Paths` and sets `Inputs`, `Output Type` and `Code` from it. Inputs that keep their name stay connected. Supported return types: `float` / `float2` / `float3` / `float4` / `FMaterialAttributes` (`out` / `inout` parameters are not supported).
 - **Auto-recompile on save**
   Watches `<Project>/Shaders` and the `Shaders` folders of enabled non-Engine plugins. When a `.ush` / `.usf` file is saved, loaded materials that include files from that folder are recompiled.
 - **Settings** (`Editor Preferences > Plugins > Custom HLSL Tools`)
