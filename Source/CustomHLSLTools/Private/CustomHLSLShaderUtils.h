@@ -16,6 +16,9 @@ namespace CustomHLSLTools
 	/** True if the virtual path maps to a shader directory but the file is not there (e.g. deleted in the file explorer). */
 	bool IsShaderFileMissing(const FString& VirtualPath);
 
+	/** Returns the relative names (e.g. "Sub/MyFunc") of every .ush file in <Project>/Shaders, sorted. */
+	TArray<FString> FindProjectShaderFiles();
+
 	/** Opens the files using the method chosen in the plugin settings. Returns false if nothing could be opened. */
 	bool OpenFilesInExternalEditor(const TArray<FString>& AbsoluteFilePaths);
 

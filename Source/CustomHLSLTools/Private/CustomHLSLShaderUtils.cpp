@@ -35,6 +35,25 @@ bool IsShaderFileMissing(const FString& VirtualPath)
 	return !AbsolutePath.IsEmpty() && !FPaths::FileExists(AbsolutePath);
 }
 
+TArray<FString> FindProjectShaderFiles()
+{
+	const FString Directory = GetProjectShaderDirectory();
+	TArray<FString> Files;
+	IFileManager::Get().FindFilesRecursive(Files, *Directory, TEXT("*.ush"), true, false);
+
+	TArray<FString> Names;
+	for (const FString& File : Files)
+	{
+		FString Relative = File;
+		if (FPaths::MakePathRelativeTo(Relative, *(Directory + TEXT("/"))))
+		{
+			Names.Add(FPaths::ChangeExtension(Relative, FString()));
+		}
+	}
+	Names.Sort();
+	return Names;
+}
+
 FString ResolveVirtualShaderPath(const FString& VirtualPath, FText& OutError)
 {
 	const FString AbsolutePath = GetAbsoluteShaderPath(VirtualPath);

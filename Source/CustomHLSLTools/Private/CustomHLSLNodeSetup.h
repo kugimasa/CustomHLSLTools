@@ -32,7 +32,8 @@ namespace CustomHLSLTools
 	/**
 	 * Reads the function signature from the shader file and sets up the node (Inputs, Output Type, Code, Include File Paths).
 	 * Input pins whose names are kept stay connected. The function named like the file is preferred, otherwise the first one is used.
+	 * If ReplacedVirtualPath is set, that Include File Paths entry is replaced by VirtualPath instead of appending.
 	 * Returns false and fills OutError on failure.
 	 */
-	bool SetupNodeFromShaderFile(UMaterialExpressionCustom& Expression, const FString& VirtualPath, FText& OutError);
+	bool SetupNodeFromShaderFile(UMaterialExpressionCustom& Expression, const FString& VirtualPath, FText& OutError, const FString& ReplacedVirtualPath = FString());
 }

@@ -482,7 +482,7 @@ bool CreateShaderFile(UMaterialExpressionCustom& Expression, const FString& Rela
 	return true;
 }
 
-bool SetupNodeFromShaderFile(UMaterialExpressionCustom& Expression, const FString& VirtualPath, FText& OutError)
+bool SetupNodeFromShaderFile(UMaterialExpressionCustom& Expression, const FString& VirtualPath, FText& OutError, const FString& ReplacedVirtualPath)
 {
 	const FString File = ResolveVirtualShaderPath(VirtualPath, OutError);
 	if (File.IsEmpty())
@@ -536,7 +536,15 @@ bool SetupNodeFromShaderFile(UMaterialExpressionCustom& Expression, const FStrin
 	});
 	ModifyProperty(Expression, GET_MEMBER_NAME_CHECKED(UMaterialExpressionCustom, IncludeFilePaths), [&]()
 	{
-		Expression.IncludeFilePaths.AddUnique(VirtualPath);
+		const int32 ReplacedIndex = ReplacedVirtualPath.IsEmpty() ? INDEX_NONE : Expression.IncludeFilePaths.Find(ReplacedVirtualPath);
+		if (ReplacedIndex != INDEX_NONE && !Expression.IncludeFilePaths.Contains(VirtualPath))
+		{
+			Expression.IncludeFilePaths[ReplacedIndex] = VirtualPath;
+		}
+		else
+		{
+			Expression.IncludeFilePaths.AddUnique(VirtualPath);
+		}
 	});
 	ModifyProperty(Expression, GET_MEMBER_NAME_CHECKED(UMaterialExpressionCustom, Code), [&]()
 	{

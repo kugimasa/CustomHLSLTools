@@ -12,6 +12,7 @@
 #include "Styling/SlateTypes.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
@@ -191,6 +192,87 @@ namespace
 		}
 		return FReply::Handled();
 	}
+
+	/** Adds a drop down listing the .ush files in <Project>/Shaders. Does nothing if there are none. */
+	void AddExistingShaderRow(IDetailCategoryBuilder& Category, const TArray<TWeakObjectPtr<UMaterialExpressionCustom>>& Expressions, const FString& CurrentVirtualPath, const TWeakPtr<IPropertyUtilities>& PropertyUtilities)
+	{
+		const TArray<FString> Names = CustomHLSLTools::FindProjectShaderFiles();
+		if (Names.IsEmpty())
+		{
+			return;
+		}
+
+		FString CurrentName;
+		if (!CurrentVirtualPath.IsEmpty())
+		{
+			CustomHLSLTools::GetProjectShaderRelativeName(CurrentVirtualPath, CurrentName);
+		}
+
+		const TSharedRef<TArray<TSharedPtr<FString>>> Options = MakeShared<TArray<TSharedPtr<FString>>>();
+		TSharedPtr<FString> Current;
+		for (const FString& Name : Names)
+		{
+			Options->Add(MakeShared<FString>(Name));
+			if (Name == CurrentName)
+			{
+				Current = Options->Last();
+			}
+		}
+
+		Category.AddCustomRow(LOCTEXT("ExistingShaderRow", "Existing Shader File"))
+		.NameContent()
+		[
+			SNew(STextBlock)
+			.Font(IDetailLayoutBuilder::GetDetailFont())
+			.Text(LOCTEXT("ExistingShaderLabel", "Existing Shader File"))
+			.ToolTipText(LOCTEXT("ExistingShaderTooltip", "Uses a file that already exists in <Project>/Shaders. Sets Inputs, Output Type and Code from its function signature."))
+		]
+		.ValueContent()
+		.MinDesiredWidth(250.0f)
+		[
+			SNew(SComboBox<TSharedPtr<FString>>)
+			.OptionsSource(&Options.Get())
+			.InitiallySelectedItem(Current)
+			.OnGenerateWidget_Lambda([Options](TSharedPtr<FString> Item)
+			{
+				return SNew(STextBlock)
+					.Font(IDetailLayoutBuilder::GetDetailFont())
+					.Text(FText::FromString(*Item));
+			})
+			.OnSelectionChanged_Lambda([Options, Expressions, CurrentVirtualPath, CurrentName, PropertyUtilities](TSharedPtr<FString> Selected, ESelectInfo::Type SelectInfo)
+			{
+				UMaterialExpressionCustom* Expression = Expressions.Num() == 1 ? Expressions[0].Get() : nullptr;
+				if (!Selected.IsValid() || SelectInfo == ESelectInfo::Direct || !Expression || *Selected == CurrentName)
+				{
+					return;
+				}
+
+				FText Error;
+				const FString NewVirtualPath = FString::Printf(TEXT("/Project/%s.ush"), **Selected);
+				FScopedTransaction Transaction(LOCTEXT("SelectShaderTransaction", "Use Existing Shader File"));
+				if (CustomHLSLTools::EnsureProjectShaderDirectory(Error)
+					&& CustomHLSLTools::SetupNodeFromShaderFile(*Expression, NewVirtualPath, Error, CurrentVirtualPath))
+				{
+					CustomHLSLTools::ShowNotification(FText::Format(LOCTEXT("ShaderSelected", "Set up the Custom node from {0}."), FText::FromString(NewVirtualPath)), true);
+				}
+				else
+				{
+					Transaction.Cancel();
+					CustomHLSLTools::ShowNotification(Error, false);
+				}
+
+				if (TSharedPtr<IPropertyUtilities> Utilities = PropertyUtilities.Pin())
+				{
+					Utilities->ForceRefresh();
+				}
+			})
+			[
+				SNew(STextBlock)
+				.Font(IDetailLayoutBuilder::GetDetailFont())
+				.Text(Current.IsValid() ? FText::FromString(*Current) : LOCTEXT("ExistingShaderHint", "Select a shader file..."))
+			]
+		];
+	}
 }
 
 TSharedRef<IDetailCustomization> FCustomHLSLExpressionCustomization::MakeInstance()
@@ -294,6 +376,8 @@ void FCustomHLSLExpressionCustomization::CustomizeDetails(IDetailLayoutBuilder& 
 				})
 			]
 		];
+
+		AddExistingShaderRow(Category, Expressions, FString(), PropertyUtilities);
 		return;
 	}
 
@@ -326,6 +410,8 @@ void FCustomHLSLExpressionCustomization::CustomizeDetails(IDetailLayoutBuilder& 
 				}
 			})
 		];
+
+		AddExistingShaderRow(Category, Expressions, VirtualPath, PropertyUtilities);
 
 		if (bMissing)
 		{
